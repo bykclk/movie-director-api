@@ -16,8 +16,16 @@ const createDirectorValidation = [
 
 const updateDirectorValidation = [
   param("id").isMongoId().withMessage("Invalid director ID"),
-  body("firstName").optional().trim().notEmpty().withMessage("First name cannot be empty"),
-  body("lastName").optional().trim().notEmpty().withMessage("Last name cannot be empty"),
+  body("firstName")
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage("First name cannot be empty"),
+  body("lastName")
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage("Last name cannot be empty"),
   body("birthDate")
     .optional()
     .isISO8601()

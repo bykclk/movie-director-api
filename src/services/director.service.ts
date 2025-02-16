@@ -39,10 +39,7 @@ export class DirectorService {
   static async searchDirectors(query: string): Promise<IDirector[]> {
     const searchRegex = new RegExp(query, "i");
     return await Director.find({
-      $or: [
-        { firstName: searchRegex },
-        { lastName: searchRegex }
-      ]
+      $or: [{ firstName: searchRegex }, { lastName: searchRegex }],
     }).sort({ firstName: 1, lastName: 1 });
   }
 }

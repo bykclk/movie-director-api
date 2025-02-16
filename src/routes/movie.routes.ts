@@ -62,9 +62,7 @@ const router = Router();
 // Validation middleware
 const createMovieValidation = [
   body("title").trim().notEmpty().withMessage("Title is required"),
-  body("director")
-    .isMongoId()
-    .withMessage("Valid director ID is required"),
+  body("director").isMongoId().withMessage("Valid director ID is required"),
   body("releaseYear")
     .isInt({ min: 1888, max: new Date().getFullYear() })
     .withMessage(
@@ -73,10 +71,7 @@ const createMovieValidation = [
   body("genre")
     .isArray({ min: 1 })
     .withMessage("At least one genre is required"),
-  body("genre.*")
-    .trim()
-    .notEmpty()
-    .withMessage("Genre cannot be empty"),
+  body("genre.*").trim().notEmpty().withMessage("Genre cannot be empty"),
   body("duration")
     .isInt({ min: 1 })
     .withMessage("Duration must be at least 1 minute"),
@@ -99,7 +94,11 @@ const createMovieValidation = [
 
 const updateMovieValidation = [
   param("id").isMongoId().withMessage("Invalid movie ID"),
-  body("title").optional().trim().notEmpty().withMessage("Title cannot be empty"),
+  body("title")
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage("Title cannot be empty"),
   body("director")
     .optional()
     .isMongoId()

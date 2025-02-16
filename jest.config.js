@@ -14,4 +14,8 @@ module.exports = {
   restoreMocks: true,
   testTimeout: 10000,
   detectOpenHandles: true,
+  transform: {
+    '^.+\\.tsx?$': 'ts-jest',
+  },
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 }; 

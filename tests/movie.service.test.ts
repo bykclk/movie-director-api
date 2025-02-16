@@ -1,7 +1,36 @@
 import mongoose, { Types } from 'mongoose';
-import { MovieService } from '../src/services/movie.service';
 import { Movie, IMovie } from '../src/models/movie.model';
 import { Director, IDirector } from '../src/models/director.model';
+
+// Mock function declarations
+const mockGet = jest.fn();
+const mockSet = jest.fn();
+const mockPublishCacheClear = jest.fn();
+const mockNatsPublish = jest.fn();
+const mockNatsSubscribe = jest.fn();
+
+// Mock NATS
+jest.mock('../src/config/nats', () => ({
+  __esModule: true,
+  getNatsClient: jest.fn(() => ({
+    publish: mockNatsPublish,
+    subscribe: mockNatsSubscribe,
+  })),
+}));
+
+// Mock CacheService
+jest.mock('../src/services/cache.service', () => ({
+  CacheService: {
+    getInstance: jest.fn(() => ({
+      get: mockGet,
+      set: mockSet,
+      publishCacheClear: mockPublishCacheClear,
+    })),
+  },
+}));
+
+// Import after mocks
+import { MovieService } from '../src/services/movie.service';
 
 describe('MovieService', () => {
   let testDirector: IDirector & { _id: Types.ObjectId };
@@ -14,7 +43,6 @@ describe('MovieService', () => {
   afterAll(async () => {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
-    // Add a small delay to ensure connection is fully closed
     await new Promise(resolve => setTimeout(resolve, 500));
   });
 
@@ -29,6 +57,9 @@ describe('MovieService', () => {
       birthDate: new Date('1970-01-01'),
       biography: 'Test Biography',
     }) as IDirector & { _id: Types.ObjectId };
+
+    // Reset mock functions
+    jest.clearAllMocks();
   });
 
   afterEach(async () => {
@@ -432,4 +463,131 @@ describe('MovieService', () => {
       });
     });
   });
-}); 
+
+  describe('Cache Operations', () => {
+    let consoleErrorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should handle cache errors gracefully when getting movies', async () => {
+      mockGet.mockRejectedValue(new Error('Cache error'));
+
+      const movies = await MovieService.getAllMovies();
+      
+      expect(movies).toBeDefined();
+      expect(Array.isArray(movies)).toBeTruthy();
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+
+    it('should handle cache errors gracefully when setting movies', async () => {
+      mockSet.mockRejectedValue(new Error('Cache error'));
+      mockGet.mockResolvedValue(null);
+
+      // Create a test movie but prefix with underscore since we don't use it directly
+      const _movie = await Movie.create({
+        title: 'Test Movie',
+        director: testDirector._id,
+        releaseYear: 2020,
+        genre: ['Drama'],
+        duration: 120,
+        description: 'Test Description',
+        rating: 8.5,
+      });
+
+      const movies = await MovieService.getAllMovies();
+      
+      expect(movies).toBeDefined();
+      expect(Array.isArray(movies)).toBeTruthy();
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+
+    it('should handle cache clear errors gracefully', async () => {
+      mockPublishCacheClear.mockRejectedValue(new Error('Cache clear error'));
+
+      const movieData = {
+        title: 'New Movie',
+        director: testDirector._id,
+        releaseYear: 2020,
+        genre: ['Drama'],
+        duration: 120,
+        description: 'New Description',
+        rating: 8.5,
+      };
+
+      const createdMovie = await MovieService.createMovie(movieData);
+      
+      expect(createdMovie).toBeDefined();
+      expect(createdMovie.title).toBe(movieData.title);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('Cache Invalidation', () => {
+    it('should invalidate all related caches when updating a movie', async () => {
+      const movie = await Movie.create({
+        title: 'Original Movie',
+        director: testDirector._id,
+        releaseYear: 2020,
+        genre: ['Drama'],
+        duration: 120,
+        description: 'Original Description',
+        rating: 8.5,
+      }) as IMovie & { _id: Types.ObjectId };
+
+      await MovieService.updateMovie(movie._id.toString(), { title: 'Updated Movie' });
+
+      expect(mockPublishCacheClear).toHaveBeenCalled();
+      const publishCalls = mockPublishCacheClear.mock.calls;
+      expect(publishCalls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should invalidate genre-specific cache when movie genre is updated', async () => {
+      const movie = await Movie.create({
+        title: 'Genre Movie',
+        director: testDirector._id,
+        releaseYear: 2020,
+        genre: ['Drama'],
+        duration: 120,
+        description: 'Genre Description',
+        rating: 8.5,
+      }) as IMovie & { _id: Types.ObjectId };
+
+      await MovieService.updateMovie(movie._id.toString(), { 
+        genre: ['Action', 'Thriller']
+      });
+
+      expect(mockPublishCacheClear).toHaveBeenCalled();
+    });
+
+    it('should invalidate director-specific cache when movie director is updated', async () => {
+      const newDirector = await Director.create({
+        firstName: 'New',
+        lastName: 'Director',
+        birthDate: new Date('1990-01-01'),
+        biography: 'New Biography',
+      }) as IDirector & { _id: Types.ObjectId };
+
+      const movie = await Movie.create({
+        title: 'Director Movie',
+        director: testDirector._id,
+        releaseYear: 2020,
+        genre: ['Drama'],
+        duration: 120,
+        description: 'Director Description',
+        rating: 8.5,
+      }) as IMovie & { _id: Types.ObjectId };
+
+      await MovieService.updateMovie(movie._id.toString(), { 
+        director: newDirector._id
+      });
+
+      expect(mockPublishCacheClear).toHaveBeenCalled();
+    });
+  });
+});

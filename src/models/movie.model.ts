@@ -58,7 +58,7 @@ const movieSchema = new Schema<IMovie>(
       sparse: true,
       trim: true,
       match: [/^tt\d{7,8}$/, "Please enter a valid IMDB ID (e.g., tt1234567)"],
-      index: true
+      index: true,
     },
     rating: {
       type: Number,

@@ -38,7 +38,7 @@ const directorSchema = new Schema<IDirector>(
 );
 
 // Virtual for full name
-directorSchema.virtual('fullName').get(function() {
+directorSchema.virtual("fullName").get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
 

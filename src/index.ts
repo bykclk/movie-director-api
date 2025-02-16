@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
 import { connectDB } from "./config/database";
+import { connectNATS } from "./config/nats";
 import movieRoutes from "./routes/movie.routes";
 import directorRoutes from "./routes/director.routes";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
@@ -15,8 +16,18 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB and NATS
+const initializeServices = async (): Promise<void> => {
+  try {
+    await connectDB();
+    await connectNATS();
+  } catch (error) {
+    console.error("Failed to initialize services:", error);
+    process.exit(1);
+  }
+};
+
+initializeServices();
 
 // Middleware
 app.use(cors());
